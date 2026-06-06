@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  srs:
+    image: ossrs/srs:5
+    container_name: srs
+    restart: always
+    ports:
+      - "1935:1935"        # RTMP
+      - "8085:8080"        # HTTP 页面
+      - "1985:1985"        # HTTP API
+      - "8009:8009/udp"    # WebRTC 媒体
+    volumes:
+      - /home/docker/rtc/rtc.conf:/usr/local/srs/conf/rtc.conf
+    command: ./objs/srs -c conf/rtc.conf
