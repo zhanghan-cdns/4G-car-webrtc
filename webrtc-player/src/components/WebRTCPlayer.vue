@@ -91,6 +91,7 @@ function getIceServers() {
 
 function createPeerConnection() {
   pc = new RTCPeerConnection(getIceServers())
+  pc.addTransceiver('audio', { direction: 'recvonly' })
   pc.addTransceiver('video', { direction: 'recvonly' })
 
   pc.ontrack = (event) => {

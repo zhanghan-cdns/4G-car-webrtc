@@ -75,7 +75,20 @@ sudo apt install librkmpv* rockchip-mpp
 
 ## LubanCat 推流命令
 
-### 720P 带水印
+### 720P 带水印 + 音频 + 视频
+
+```bash
+ffmpeg -thread_queue_size 4096 \
+  -f v4l2 -video_size 1280x720 -framerate 30 \
+  -i /dev/video0 \
+  -f alsa -ac 1 -ar 44100 -i plughw:3,0 \
+  -vf "drawtext=text=lubancat_%{localtime}:fontcolor=white:fontsize=24:x=W-tw-20:y=20:box=1:boxcolor=black@0.5:boxborderw=5" \
+  -c:v h264_rkmpp -b:v 4M -g 60 -bf 0 \
+  -c:a aac -b:a 96k \
+  -f flv rtmp://你的服务器IP:1935/live/cam01
+```
+
+### 720P 带水印（纯视频）
 
 ```bash
 ffmpeg -thread_queue_size 4096 \
