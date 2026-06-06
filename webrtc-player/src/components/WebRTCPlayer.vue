@@ -15,22 +15,26 @@
     </div>
 
     <div class="controls">
-      <div class="control-row">
-        <label>协议：</label>
-        <select v-model="mode">
-          <option value="srs">SRS</option>
-          <option value="whep">WHEP</option>
-          <option value="zlmediakit">ZLMediaKit</option>
-        </select>
-        <label>API 端口：</label>
-        <input v-model="apiPort" type="text" class="port-input" placeholder="1985" />
-      </div>
-      <div class="control-row">
-        <label>地址：</label>
-        <input v-model="inputUrl" type="text" @keyup.enter="connect" />
-        <button @click="connect" :disabled="connecting">连接</button>
-        <button v-if="connected" @click="disconnect" class="stop-btn">断开</button>
-      </div>
+      <button v-if="!connected" @click="connect" :disabled="connecting" class="connect-btn">{{ connecting ? '连接中...' : '连接' }}</button>
+      <button v-else @click="disconnect" class="stop-btn">断开</button>
+    </div>
+  </div>
+
+  <div class="wheel-wrapper">
+    <div class="wheel" role="group" aria-label="方向控制">
+      <button class="wheel-btn up" @click="onWheel('up')" aria-label="上">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6l8 10H4z"/></svg>
+      </button>
+      <button class="wheel-btn right" @click="onWheel('right')" aria-label="右">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 12l-10 8V4z"/></svg>
+      </button>
+      <button class="wheel-btn down" @click="onWheel('down')" aria-label="下">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18L4 8h16z"/></svg>
+      </button>
+      <button class="wheel-btn left" @click="onWheel('left')" aria-label="左">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12l10-8v16z"/></svg>
+      </button>
+      <div class="wheel-center" aria-hidden="true"></div>
     </div>
   </div>
 </template>
@@ -45,9 +49,6 @@ const props = defineProps({
 const videoEl = ref(null)
 const container = ref(null)
 
-const inputUrl = ref(props.src)
-const mode = ref('srs')
-const apiPort = ref('')
 const statusText = ref('准备连接...')
 const connected = ref(false)
 const connecting = ref(false)
@@ -90,7 +91,6 @@ function getIceServers() {
 
 function createPeerConnection() {
   pc = new RTCPeerConnection(getIceServers())
-  // 只添加 video transceiver（该流没有音频）
   pc.addTransceiver('video', { direction: 'recvonly' })
 
   pc.ontrack = (event) => {
@@ -117,7 +117,7 @@ function createPeerConnection() {
 
 async function connectWithSrs(parsed) {
   const scheme = window.location.protocol === 'https:' ? 'https:' : 'http:'
-  const port = apiPort.value || parsed.port || '1985'
+  const port = parsed.port || '1985'
 
   let apiUrl = `${scheme}//${parsed.host}:${port}/rtc/v1/play/`
   if (parsed.query) {
@@ -164,7 +164,7 @@ async function connectWithSrs(parsed) {
 }
 
 async function connectWithWhep(parsed) {
-  const port = apiPort.value || parsed.port || '8080'
+  const port = parsed.port || '8080'
   const url = `http://${parsed.host}:${port}/whep/${parsed.app}/${parsed.stream}`
   statusText.value = `正在请求 WHEP (${url})...`
 
@@ -190,7 +190,7 @@ async function connectWithWhep(parsed) {
 }
 
 async function connectWithZlmediakit(parsed) {
-  const port = apiPort.value || parsed.port || '8085'
+  const port = parsed.port || '8085'
   const url = `http://${parsed.host}:${port}/index/api/webrtc?app=${parsed.app}&stream=${parsed.stream}&type=play`
   statusText.value = `正在请求 ZLMediaKit (${url})...`
 
@@ -222,7 +222,7 @@ async function connect() {
 
   let parsed
   try {
-    parsed = parseUrl(inputUrl.value)
+    parsed = parseUrl(props.src)
   } catch (e) {
     error.value = e.message
     return
@@ -236,13 +236,7 @@ async function connect() {
   try {
     createPeerConnection()
 
-    if (mode.value === 'srs') {
-      await connectWithSrs(parsed)
-    } else if (mode.value === 'whep') {
-      await connectWithWhep(parsed)
-    } else {
-      await connectWithZlmediakit(parsed)
-    }
+    await connectWithSrs(parsed)
 
     statusText.value = '等待媒体流...'
   } catch (e) {
@@ -276,6 +270,11 @@ function disconnect() {
 function retry() {
   error.value = null
   connect()
+}
+
+function onWheel(dir) {
+  // TODO: 控制指令发送
+  console.log('方向盘:', dir)
 }
 
 onBeforeUnmount(() => disconnect())
@@ -358,68 +357,172 @@ onBeforeUnmount(() => disconnect())
 .controls {
   padding: 16px 20px;
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  justify-content: center;
 }
 
-.control-row {
+.wheel-wrapper {
+  margin-top: 20px;
+  padding: 24px 16px;
+  display: flex;
+  justify-content: center;
+  background: transparent;
+}
+
+.wheel {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 28%, #2d2d52 0%, #181830 55%, #0d0d1c 100%);
+  box-shadow:
+    inset 0 2px 6px rgba(255, 255, 255, 0.06),
+    inset 0 -3px 10px rgba(0, 0, 0, 0.55),
+    0 10px 24px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.wheel-btn {
+  position: absolute;
+  width: 58px;
+  height: 58px;
+  padding: 0;
+  border: none;
+  background: linear-gradient(150deg, #32325a 0%, #1a1a30 100%);
+  color: #c8c8e0;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow:
+    0 3px 6px rgba(0, 0, 0, 0.5),
+    inset 0 1px 1px rgba(255, 255, 255, 0.12),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.4);
 }
 
-.control-row label {
-  font-size: 13px;
-  color: #888;
-  white-space: nowrap;
+.wheel-btn svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+  transition: transform 0.15s ease, filter 0.15s ease;
 }
 
-.control-row select,
-.control-row input {
-  flex: 1;
-  padding: 6px 10px;
-  border: 1px solid #333;
-  border-radius: 6px;
-  background: #1a1a2e;
-  color: #eee;
-  font-size: 13px;
-  outline: none;
-}
-
-.control-row select:focus,
-.control-row input:focus {
-  border-color: #e94560;
-}
-
-.control-row .port-input {
-  flex: 0 0 70px;
-}
-
-.control-row button {
-  padding: 6px 16px;
-  border: none;
-  border-radius: 6px;
-  background: #e94560;
+.wheel-btn:hover {
   color: #fff;
+}
+
+.wheel-btn:hover svg {
+  transform: scale(1.08);
+  filter: drop-shadow(0 0 6px rgba(233, 69, 96, 0.55));
+}
+
+.wheel-btn:active {
+  background: linear-gradient(150deg, #e94560 0%, #b8324a 100%);
+  color: #fff;
+  box-shadow:
+    inset 0 3px 6px rgba(0, 0, 0, 0.45),
+    0 0 14px rgba(233, 69, 96, 0.5);
+}
+
+.wheel-btn:active svg {
+  transform: scale(0.9);
+  filter: none;
+}
+
+.wheel-btn.up {
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 50% 50% 10px 10px;
+}
+
+.wheel-btn.down {
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 10px 10px 50% 50%;
+}
+
+.wheel-btn.left {
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-radius: 50% 10px 10px 50%;
+}
+
+.wheel-btn.right {
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-radius: 10px 50% 50% 10px;
+}
+
+.wheel-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #20203c 0%, #08081a 100%);
+  transform: translate(-50%, -50%);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.8),
+    inset 0 -1px 2px rgba(255, 255, 255, 0.05),
+    0 0 0 1px rgba(233, 69, 96, 0.18);
+  pointer-events: none;
+}
+
+.wheel-center::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #e94560;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 8px rgba(233, 69, 96, 0.9);
+}
+
+.connect-btn, .stop-btn {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 16px;
+  font-weight: 600;
   transition: opacity 0.2s;
 }
 
-.control-row button:hover {
-  opacity: 0.85;
+.connect-btn {
+  background: #e94560;
+  color: #fff;
 }
 
-.control-row button:disabled {
+.connect-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.control-row .stop-btn {
+.stop-btn {
   background: #555;
+  color: #fff;
 }
 
-.control-row .stop-btn:hover {
-  background: #777;
+@media (max-width: 600px) {
+  .controls { padding: 12px; }
+  .connect-btn, .stop-btn { padding: 14px; font-size: 17px; }
+  .retry-btn { padding: 10px 24px; font-size: 15px; }
+  .error-text { font-size: 13px; }
+  .wheel { width: 160px; height: 160px; }
+  .wheel-btn { width: 52px; height: 52px; }
+  .wheel-btn svg { width: 20px; height: 20px; }
+  .wheel-center { width: 34px; height: 34px; }
 }
 </style>

@@ -1,12 +1,14 @@
 <template>
   <div class="app">
-    <h1>WebRTC 视频播放器</h1>
-    <WebRTCPlayer src="webrtc://120.26.89.24:1985/live/cam01" />
+    <WebRTCPlayer :src="srsUrl" />
   </div>
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import WebRTCPlayer from './components/WebRTCPlayer.vue'
+
+const srsUrl = ref(import.meta.env.VITE_SRS_URL || 'webrtc://your_server_ip:1985/live/cam01')
 </script>
 
 <style>
@@ -26,9 +28,7 @@ body {
   margin: 0 auto;
   padding: 40px 20px;
 }
-h1 {
-  text-align: center;
-  margin-bottom: 30px;
-  color: #e94560;
+@media (max-width: 600px) {
+  .app { padding: 20px 10px; }
 }
 </style>
