@@ -13,11 +13,11 @@
         <button class="retry-btn" @click="retry">重试</button>
       </div>
     </div>
+  </div>
 
-    <div class="controls">
-      <button v-if="!connected" @click="connect" :disabled="connecting" class="connect-btn">{{ connecting ? '连接中...' : '连接' }}</button>
-      <button v-else @click="disconnect" class="stop-btn">断开</button>
-    </div>
+  <div class="controls">
+    <button v-if="!connected" @click="connect" :disabled="connecting" class="connect-btn">{{ connecting ? '连接中...' : '连接' }}</button>
+    <button v-else @click="disconnect" class="stop-btn">断开</button>
   </div>
 
   <div class="wheel-wrapper">
@@ -286,6 +286,19 @@ onBeforeUnmount(() => disconnect())
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.controls {
+  padding: 20px 0 4px;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+@media (min-width: 768px) {
+  .player-wrapper { max-width: 1200px; }
+  .controls { max-width: 1200px; }
 }
 
 .video-container {
@@ -355,9 +368,27 @@ onBeforeUnmount(() => disconnect())
 }
 
 .controls {
-  padding: 16px 20px;
-  display: flex;
-  justify-content: center;
+  padding: 20px 0 4px;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.connect-btn, .stop-btn {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  transition: opacity 0.2s;
+}
+
+.wheel {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  margin: 24px auto 16px;
 }
 
 .wheel-wrapper {
