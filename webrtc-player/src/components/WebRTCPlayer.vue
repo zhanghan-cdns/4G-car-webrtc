@@ -1,46 +1,137 @@
 <template>
-  <div class="player-wrapper">
-    <div class="video-container" ref="container">
-      <video ref="videoEl" autoplay playsinline muted controls></video>
-
-      <div v-if="!connected && !error" class="overlay">
-        <div class="spinner"></div>
-        <p>{{ statusText }}</p>
+  <div class="player">
+    <div class="camera-bar">
+      <div class="camera-bar-left">
+        <svg class="camera-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="12" y1="18" x2="12" y2="12" />
+          <line x1="9" y1="15" x2="15" y2="15" />
+        </svg>
+        <span class="camera-name">摄像头 01</span>
+        <span class="camera-url" :title="src">{{ src }}</span>
       </div>
-
-      <div v-if="error" class="overlay error-overlay">
-        <p class="error-text">{{ error }}</p>
-        <button class="retry-btn" @click="retry">重试</button>
+      <div class="camera-bar-right">
+        <div class="badge" :class="badgeClass">
+          <span class="badge-dot"></span>
+          <span class="badge-label">{{ badgeText }}</span>
+        </div>
       </div>
     </div>
-  </div>
 
-  <div class="controls">
-    <button v-if="!connected" @click="connect" :disabled="connecting" class="connect-btn">{{ connecting ? '连接中...' : '连接' }}</button>
-    <button v-else @click="disconnect" class="stop-btn">断开</button>
-  </div>
+    <div class="video-section">
+      <div class="video-wrapper" ref="container">
+        <video ref="videoEl" autoplay playsinline muted></video>
 
-  <div class="wheel-wrapper">
-    <div class="wheel" role="group" aria-label="方向控制">
-      <button class="wheel-btn up" @click="onWheel('up')" aria-label="上">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6l8 10H4z"/></svg>
-      </button>
-      <button class="wheel-btn right" @click="onWheel('right')" aria-label="右">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 12l-10 8V4z"/></svg>
-      </button>
-      <button class="wheel-btn down" @click="onWheel('down')" aria-label="下">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18L4 8h16z"/></svg>
-      </button>
-      <button class="wheel-btn left" @click="onWheel('left')" aria-label="左">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12l10-8v16z"/></svg>
-      </button>
-      <div class="wheel-center" aria-hidden="true"></div>
+        <div v-if="!connected && !error" class="overlay overlay-idle">
+          <button class="play-btn" @click="connect" :disabled="connecting">
+            <svg v-if="!connecting" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+            <div v-else class="spinner"></div>
+          </button>
+          <p class="overlay-title">{{ connecting ? '正在建立连接...' : '点击开始播放' }}</p>
+          <p v-if="!connecting" class="overlay-hint">WebRTC 视频流</p>
+        </div>
+
+        <div v-if="error" class="overlay overlay-error">
+          <svg class="err-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <p class="err-text">{{ error }}</p>
+          <button class="retry-btn" @click="retry">重试</button>
+        </div>
+
+        <div v-if="connected" class="video-toolbar">
+          <button class="tool-btn" @click="toggleMute" :title="isMuted ? '取消静音' : '静音'">
+            <svg v-if="!isMuted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+            </svg>
+            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              <line x1="23" y1="9" x2="17" y2="15" />
+              <line x1="17" y1="9" x2="23" y2="15" />
+            </svg>
+          </button>
+          <button class="tool-btn" @click="onTool('snapshot')" title="截图">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="23 7 16 12 23 17 23 7" />
+              <rect x="1" y="5" width="15" height="14" rx="2" />
+            </svg>
+          </button>
+          <button class="tool-btn" @click="onTool('fullscreen')" title="全屏">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="control-bar">
+      <div class="control-left">
+        <button
+          v-if="!connected"
+          @click="connect"
+          :disabled="connecting"
+          class="btn btn-primary"
+        >
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon v-if="!connecting" points="5 3 19 12 5 21 5 3" />
+          </svg>
+          <span>{{ connecting ? '连接中...' : '开始播放' }}</span>
+        </button>
+        <button
+          v-else
+          @click="disconnect"
+          class="btn btn-secondary"
+        >
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="6" y="6" width="12" height="12" rx="2" />
+          </svg>
+          <span>断开</span>
+        </button>
+      </div>
+      <div class="control-right">
+        <span class="ptz-label">云台</span>
+      </div>
+    </div>
+
+    <div class="ptz-section">
+      <div class="dpad" role="group" aria-label="方向控制">
+        <button class="dpad-btn up" @click="onWheel('up')" aria-label="上">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 5l7 10H5z"/>
+          </svg>
+        </button>
+        <button class="dpad-btn right" @click="onWheel('right')" aria-label="右">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12L9 5v14z"/>
+          </svg>
+        </button>
+        <button class="dpad-btn down" @click="onWheel('down')" aria-label="下">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 19l-7-10h14z"/>
+          </svg>
+        </button>
+        <button class="dpad-btn left" @click="onWheel('left')" aria-label="左">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12l10-7v14z"/>
+          </svg>
+        </button>
+        <div class="dpad-center" aria-hidden="true"></div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
+
+const emit = defineEmits(['update:status'])
 
 const props = defineProps({
   src: { type: String, default: '' }
@@ -53,8 +144,34 @@ const statusText = ref('准备连接...')
 const connected = ref(false)
 const connecting = ref(false)
 const error = ref(null)
+const isMuted = ref(true)
 
 let pc = null
+
+const badgeClass = computed(() => {
+  if (error.value) return 'badge-error'
+  if (connected.value) return 'badge-online'
+  if (connecting.value) return 'badge-connecting'
+  return 'badge-offline'
+})
+
+const badgeText = computed(() => {
+  if (error.value) return '连接失败'
+  if (connected.value) return '在线'
+  if (connecting.value) return '连接中'
+  return '未连接'
+})
+
+function emitStatus(status) {
+  emit('update:status', status)
+}
+
+watch([connected, connecting, error], () => {
+  if (error.value) emitStatus('error')
+  else if (connected.value) emitStatus('connected')
+  else if (connecting.value) emitStatus('connecting')
+  else emitStatus('idle')
+}, { immediate: true })
 
 function parseUrl(url) {
   const m = url.match(/^(webrtc|rtc|rtmp):\/\/([^:/]+)(?::(\d+))?(\/[^?#]*)?(\?[^#]*)?/)
@@ -273,43 +390,152 @@ function retry() {
   connect()
 }
 
+function toggleMute() {
+  isMuted.value = !isMuted.value
+  if (videoEl.value) {
+    videoEl.value.muted = isMuted.value
+  }
+}
+
 function onWheel(dir) {
-  // TODO: 控制指令发送
   console.log('方向盘:', dir)
+}
+
+function onTool(action) {
+  console.log('工具栏:', action)
 }
 
 onBeforeUnmount(() => disconnect())
 </script>
 
 <style scoped>
-.player-wrapper {
-  background: #16213e;
-  border-radius: 12px;
+.player {
+  max-width: 960px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* ===== Camera Bar ===== */
+.camera-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+  gap: 12px;
+}
+
+.camera-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.camera-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.camera-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.camera-url {
+  font-size: 12px;
+  color: var(--text-muted);
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  max-width: 400px;
-  margin: 0 auto;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: none;
 }
 
-.controls {
-  padding: 20px 0 4px;
-  max-width: 400px;
-  margin: 0 auto;
+@media (min-width: 640px) {
+  .camera-url { display: inline; }
 }
 
-@media (min-width: 768px) {
-  .player-wrapper { max-width: 1200px; }
-  .controls { max-width: 1200px; }
+.camera-bar-right {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
-.video-container {
+.badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+
+.badge-offline {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-muted);
+}
+.badge-offline .badge-dot { background: var(--text-muted); }
+
+.badge-connecting {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--warning);
+}
+.badge-connecting .badge-dot {
+  background: var(--warning);
+  animation: pulse-dot 1s ease-in-out infinite;
+}
+
+.badge-online {
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--success);
+}
+.badge-online .badge-dot {
+  background: var(--success);
+}
+
+.badge-error {
+  background: rgba(0, 0, 0, 0.12);
+  color: var(--error);
+}
+.badge-error .badge-dot {
+  background: var(--error);
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ===== Video Section ===== */
+.video-section {
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+
+.video-wrapper {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
   background: #000;
+  overflow: hidden;
 }
 
-.video-container video {
+.video-wrapper video {
   width: 100%;
   height: 100%;
   display: block;
@@ -323,238 +549,362 @@ onBeforeUnmount(() => disconnect())
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
-  gap: 16px;
+  gap: 14px;
+  transition: opacity 0.3s ease;
 }
 
-.error-overlay {
-  background: rgba(0, 0, 0, 0.75);
+.overlay-idle {
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+.overlay-error {
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.play-btn {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s ease;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.play-btn:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: scale(1.06);
+}
+
+.play-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.play-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.play-btn svg {
+  width: 28px;
+  height: 28px;
+  margin-left: 3px;
 }
 
 .spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid rgba(233, 69, 96, 0.3);
-  border-top-color: #e94560;
+  width: 28px;
+  height: 28px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-top-color: #fff;
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  animation: spin 0.7s linear infinite;
 }
 
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 
-.error-text {
-  color: #e94560;
-  font-size: 14px;
+.overlay-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.overlay-hint {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 400;
+}
+
+.err-icon {
+  width: 36px;
+  height: 36px;
+  color: var(--error);
+  opacity: 0.8;
+}
+
+.err-text {
+  font-size: 13px;
+  color: #fca5a5;
   text-align: center;
   max-width: 80%;
   word-break: break-all;
+  line-height: 1.5;
 }
 
 .retry-btn {
-  padding: 8px 24px;
-  border: 1px solid #e94560;
-  background: transparent;
-  color: #e94560;
-  border-radius: 6px;
+  padding: 8px 22px;
+  border: 1px solid var(--accent);
+  background: var(--accent-subtle);
+  color: var(--accent);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-family);
+  transition: all 0.2s ease;
 }
 
 .retry-btn:hover {
-  background: #e94560;
+  background: var(--accent);
   color: #fff;
 }
 
-.controls {
-  padding: 20px 0 4px;
-  max-width: 400px;
-  margin: 0 auto;
-}
-
-.connect-btn, .stop-btn {
-  width: 100%;
-  padding: 12px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 16px;
-  font-weight: 600;
-  transition: opacity 0.2s;
-}
-
-.wheel {
-  position: relative;
-  width: 200px;
-  height: 200px;
-  margin: 24px auto 16px;
-}
-
-.wheel-wrapper {
-  margin-top: 20px;
-  padding: 24px 16px;
-  display: flex;
-  justify-content: center;
-  background: transparent;
-}
-
-.wheel {
-  position: relative;
-  width: 180px;
-  height: 180px;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 30% 28%, #2d2d52 0%, #181830 55%, #0d0d1c 100%);
-  box-shadow:
-    inset 0 2px 6px rgba(255, 255, 255, 0.06),
-    inset 0 -3px 10px rgba(0, 0, 0, 0.55),
-    0 10px 24px rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(255, 255, 255, 0.04);
-}
-
-.wheel-btn {
+.video-toolbar {
   position: absolute;
-  width: 58px;
-  height: 58px;
-  padding: 0;
+  bottom: 12px;
+  right: 12px;
+  display: flex;
+  gap: 6px;
+}
+
+.tool-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
   border: none;
-  background: linear-gradient(150deg, #32325a 0%, #1a1a30 100%);
-  color: #c8c8e0;
+  background: rgba(0, 0, 0, 0.55);
+  color: rgba(255, 255, 255, 0.7);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
-  box-shadow:
-    0 3px 6px rgba(0, 0, 0, 0.5),
-    inset 0 1px 1px rgba(255, 255, 255, 0.12),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s ease;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
-.wheel-btn svg {
-  width: 22px;
-  height: 22px;
-  fill: currentColor;
-  transition: transform 0.15s ease, filter 0.15s ease;
-}
-
-.wheel-btn:hover {
+.tool-btn:hover {
+  background: var(--accent);
   color: #fff;
 }
 
-.wheel-btn:hover svg {
-  transform: scale(1.08);
-  filter: drop-shadow(0 0 6px rgba(233, 69, 96, 0.55));
+.tool-btn svg {
+  width: 16px;
+  height: 16px;
 }
 
-.wheel-btn:active {
-  background: linear-gradient(150deg, #e94560 0%, #b8324a 100%);
-  color: #fff;
-  box-shadow:
-    inset 0 3px 6px rgba(0, 0, 0, 0.45),
-    0 0 14px rgba(233, 69, 96, 0.5);
+/* ===== Control Bar ===== */
+.control-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-top: none;
+  gap: 12px;
 }
 
-.wheel-btn:active svg {
-  transform: scale(0.9);
-  filter: none;
+.control-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.wheel-btn.up {
-  top: 6px;
-  left: 50%;
-  transform: translateX(-50%);
-  border-radius: 50% 50% 10px 10px;
-}
-
-.wheel-btn.down {
-  bottom: 6px;
-  left: 50%;
-  transform: translateX(-50%);
-  border-radius: 10px 10px 50% 50%;
-}
-
-.wheel-btn.left {
-  left: 6px;
-  top: 50%;
-  transform: translateY(-50%);
-  border-radius: 50% 10px 10px 50%;
-}
-
-.wheel-btn.right {
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
-  border-radius: 10px 50% 50% 10px;
-}
-
-.wheel-center {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #20203c 0%, #08081a 100%);
-  transform: translate(-50%, -50%);
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.8),
-    inset 0 -1px 2px rgba(255, 255, 255, 0.05),
-    0 0 0 1px rgba(233, 69, 96, 0.18);
-  pointer-events: none;
-}
-
-.wheel-center::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #e94560;
-  transform: translate(-50%, -50%);
-  box-shadow: 0 0 8px rgba(233, 69, 96, 0.9);
-}
-
-.connect-btn, .stop-btn {
-  width: 100%;
-  padding: 12px;
+.btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
-  transition: opacity 0.2s;
+  font-family: var(--font-family);
+  transition: all 0.2s ease;
 }
 
-.connect-btn {
-  background: #e94560;
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.btn-primary {
+  background: var(--accent);
   color: #fff;
 }
 
-.connect-btn:disabled {
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.stop-btn {
-  background: #555;
+.btn-secondary {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+  background: rgba(248, 81, 73, 0.08);
+  color: var(--error);
+  border-color: rgba(248, 81, 73, 0.3);
+}
+
+.control-right {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.ptz-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+}
+
+/* ===== PTZ Section ===== */
+.ptz-section {
+  display: flex;
+  justify-content: center;
+  padding: 20px 16px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+
+.dpad {
+  display: grid;
+  grid-template-columns: 52px 52px 52px;
+  grid-template-rows: 52px 52px 52px;
+  gap: 4px;
+  align-items: center;
+  justify-items: center;
+}
+
+.dpad-btn {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.2s ease;
+}
+
+.dpad-btn svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  transition: transform 0.2s ease;
+}
+
+.dpad-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+.dpad-btn:hover svg {
+  transform: scale(1.1);
+}
+
+.dpad-btn:active {
+  background: var(--accent);
   color: #fff;
+  border-color: var(--accent);
+  transform: translateY(0);
+}
+
+.dpad-btn:active svg {
+  transform: scale(0.9);
+}
+
+.dpad-btn.up {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.dpad-btn.right {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.dpad-btn.down {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.dpad-btn.left {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.dpad-center {
+  grid-column: 2;
+  grid-row: 2;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.dpad-center::after {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
 }
 
 @media (max-width: 600px) {
-  .controls { padding: 12px; }
-  .connect-btn, .stop-btn { padding: 14px; font-size: 17px; }
-  .retry-btn { padding: 10px 24px; font-size: 15px; }
-  .error-text { font-size: 13px; }
-  .wheel { width: 160px; height: 160px; }
-  .wheel-btn { width: 52px; height: 52px; }
-  .wheel-btn svg { width: 20px; height: 20px; }
-  .wheel-center { width: 34px; height: 34px; }
+  .camera-bar { padding: 10px 12px; }
+  .camera-name { font-size: 13px; }
+  .camera-icon { width: 16px; height: 16px; }
+  .badge { font-size: 10px; padding: 3px 8px; }
+  .badge-dot { width: 5px; height: 5px; }
+
+  .play-btn { width: 54px; height: 54px; }
+  .play-btn svg { width: 24px; height: 24px; }
+  .spinner { width: 24px; height: 24px; }
+  .overlay-title { font-size: 14px; }
+  .overlay-hint { font-size: 12px; }
+
+  .control-bar { padding: 10px 12px; }
+  .btn { padding: 8px 16px; font-size: 13px; }
+  .btn-icon { width: 14px; height: 14px; }
+  .ptz-label { font-size: 11px; }
+
+  .ptz-section { padding: 16px 12px 12px; }
+  .dpad { grid-template-columns: 46px 46px 46px; grid-template-rows: 46px 46px 46px; gap: 3px; }
+  .dpad-btn { width: 42px; height: 42px; border-radius: 8px; }
+  .dpad-btn svg { width: 16px; height: 16px; }
+  .dpad-center { width: 30px; height: 30px; }
+  .dpad-center::after { width: 4px; height: 4px; }
 }
 </style>
